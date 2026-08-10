@@ -12,13 +12,11 @@ window.DW_CONFIG = Object.freeze({
 (() => {
   "use strict";
 
-  // Keep config.js executable in the Node validation sandbox used by GitHub Actions.
   if (typeof document === "undefined" || typeof location === "undefined" || typeof localStorage === "undefined") return;
 
   const here = document.currentScript?.src || location.href;
   const base = new URL(".", here);
   const STORAGE_KEY = "dungeon-world:white-label:v2";
-  const MEDIA_KEY = "dungeon-world:white-label:media:v1";
 
   const BLANK_STATE = {
     version: 3,
@@ -33,8 +31,6 @@ window.DW_CONFIG = Object.freeze({
     theme: { campaignName:"Dungeon World", primary:"#0b1420", accent:"#8bc7ee", panel:"#101b29", text:"#e7edf5", fontScale:1, panelOpacity:.9, shade:.52, backgroundImage:null }
   };
 
-  // app.js historically assumes that a selected class always exists. Add an internal
-  // empty class before classes.js is evaluated so a brand-new sheet can remain unassigned.
   let classRegistry = window.DW_CLASSES;
   try {
     Object.defineProperty(window, "DW_CLASSES", {
@@ -73,9 +69,7 @@ window.DW_CONFIG = Object.freeze({
     document.head.appendChild(link);
   };
 
-  if (!localStorage.getItem(STORAGE_KEY)) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(BLANK_STATE));
-  }
+  if (!localStorage.getItem(STORAGE_KEY)) localStorage.setItem(STORAGE_KEY, JSON.stringify(BLANK_STATE));
 
   function refreshBlankPresentation() {
     const classSelect = document.getElementById("classSelect");
@@ -104,29 +98,12 @@ window.DW_CONFIG = Object.freeze({
     value("armor", 0);
     value("damage", 0);
     value("loadCurrent", 0);
+    document.querySelectorAll("[data-stat]").forEach((el) => { el.value = 0; });
     document.querySelectorAll("[data-mod]").forEach((el) => { el.textContent = "0"; });
     const meter=document.getElementById("loadMeter"); if(meter) meter.style.width="0%";
     const setup=document.getElementById("setupChoices"); if(setup) setup.innerHTML='<p class="small">Selecione uma classe para carregar as escolhas da classe.</p>';
     const starting=document.getElementById("startingMoves"); if(starting) starting.innerHTML="";
     const advanced=document.getElementById("advancedMoves"); if(advanced) advanced.innerHTML="";
-  }
-
-  function installBlankReset() {
-    const btn = document.getElementById("resetSheetBtn");
-    if (!btn || btn.dataset.blankResetInstalled === "1") return;
-    btn.dataset.blankResetInstalled = "1";
-    btn.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      if (!confirm("Criar uma nova ficha totalmente em branco? Isso apaga os dados locais da ficha atual.")) return;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(BLANK_STATE));
-      localStorage.removeItem(MEDIA_KEY);
-      try { window.DW_MEDIA?.set?.({ equipment:{}, history:[] }); } catch (_) {}
-      const clean = new URL(location.href);
-      clean.search = "";
-      clean.hash = "";
-      location.replace(clean.href);
-    }, true);
   }
 
   loadCss("image-actions.css");
@@ -138,8 +115,8 @@ window.DW_CONFIG = Object.freeze({
     load("sheet-enhancements.js");
     load("gameplay-tab.js");
     load("gameplay-status.js");
+    load("blank-sheet-reset.js");
     document.addEventListener("DOMContentLoaded", () => {
-      installBlankReset();
       requestAnimationFrame(refreshBlankPresentation);
       const classSelect=document.getElementById("classSelect");
       classSelect?.addEventListener("change", () => setTimeout(refreshBlankPresentation, 0));
