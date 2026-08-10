@@ -23,6 +23,40 @@
     document.head.appendChild(s);
   }
 
+  function ensureGameplayDom() {
+    const tabbar = document.querySelector(".tabbar");
+    const panels = document.querySelector("main.panels");
+    if (!tabbar || !panels) return null;
+    let tab = tabbar.querySelector('[data-tab="gameplay"]');
+    if (!tab) {
+      tab = document.createElement("button");
+      tab.type = "button";
+      tab.className = "tab-btn";
+      tab.dataset.tab = "gameplay";
+      tab.textContent = "Gameplay";
+      const settings = tabbar.querySelector('[data-tab="configuracoes"]');
+      tabbar.insertBefore(tab, settings || null);
+    }
+    if (!$("tab-gameplay")) {
+      const panel = document.createElement("section");
+      panel.id = "tab-gameplay";
+      panel.className = "tab-panel";
+      panel.innerHTML = `<article class="card gameplay-module-card"><div class="gameplay-module-head"><div><h2>Gameplay compartilhado</h2><p>A sala abre dentro da ficha. Trocar de aba não desconecta você da partida.</p></div><span class="tag muted-tag">quase em tempo real</span></div><div id="gameplayModuleShell" class="gameplay-module-shell gameplay-waiting"><iframe id="gameplayFrame" class="gameplay-frame" title="Gameplay compartilhado" loading="lazy" allow="clipboard-write"></iframe></div></article>`;
+      const settingsPanel = $("tab-configuracoes");
+      panels.insertBefore(panel, settingsPanel || null);
+    }
+    return tab;
+  }
+
+  function showGameplayPanel() {
+    document.querySelectorAll(".tab-btn").forEach((x) => x.classList.remove("active"));
+    document.querySelectorAll(".tab-panel").forEach((x) => x.classList.remove("active"));
+    const tab = document.querySelector('.tab-btn[data-tab="gameplay"]');
+    tab?.classList.add("active");
+    $("tab-gameplay")?.classList.add("active");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   function removeHeaderGameplayButtons() {
     document.querySelectorAll('.top-actions a[href*="gameplay"], .top-actions #gameplayTopBtn, .top-actions [data-gameplay-top]').forEach((el) => el.remove());
     const actions = document.querySelector(".top-actions");
@@ -34,17 +68,7 @@
     const modal = document.createElement("div");
     modal.id = "gameplayLoginModal";
     modal.className = "gameplay-login-modal hidden";
-    modal.innerHTML = `
-      <div class="gameplay-login-card" role="dialog" aria-modal="true" aria-labelledby="gameplayLoginTitle">
-        <button class="gameplay-login-close" type="button" aria-label="Fechar">×</button>
-        <p class="eyebrow">Sincronização necessária</p>
-        <h2 id="gameplayLoginTitle">Entre na sua conta para abrir o Gameplay</h2>
-        <p>O tabuleiro compartilhado precisa identificar sua conta para manter sala, mapa, participantes e bonecos sincronizados. A ficha continua aberta nesta mesma página.</p>
-        <div class="button-row">
-          <button id="gameplayLoginBtn" class="btn" type="button">Entrar e continuar</button>
-          <button id="gameplayLoginCancel" class="btn secondary" type="button">Agora não</button>
-        </div>
-      </div>`;
+    modal.innerHTML = `<div class="gameplay-login-card" role="dialog" aria-modal="true" aria-labelledby="gameplayLoginTitle"><button class="gameplay-login-close" type="button" aria-label="Fechar">×</button><p class="eyebrow">Sincronização necessária</p><h2 id="gameplayLoginTitle">Entre na sua conta para abrir o Gameplay</h2><p>O tabuleiro compartilhado precisa identificar sua conta para manter sala, mapa, participantes e bonecos sincronizados. A ficha continua aberta nesta mesma página.</p><div class="button-row"><button id="gameplayLoginBtn" class="btn" type="button">Entrar e continuar</button><button id="gameplayLoginCancel" class="btn secondary" type="button">Agora não</button></div></div>`;
     document.body.appendChild(modal);
     const close = () => modal.classList.add("hidden");
     modal.querySelector(".gameplay-login-close").addEventListener("click", close);
@@ -52,23 +76,16 @@
     modal.addEventListener("click", (e) => { if (e.target === modal) close(); });
     $("gameplayLoginBtn").addEventListener("click", async () => {
       const btn = $("gameplayLoginBtn");
-      const original = "Entrar e continuar";
       try {
-        btn.disabled = true;
-        btn.textContent = "Abrindo login…";
+        btn.disabled = true; btn.textContent = "Abrindo login…";
         const auth = window.DW_AUTH;
         if (!auth) throw new Error("Módulo de login ainda está carregando.");
-        await auth.ready;
-        await auth.ensureSignedIn();
+        await auth.ready; await auth.ensureSignedIn();
         if (!auth.getSession?.()?.user) throw new Error("Login não concluído.");
-        close();
-        loadFrame(true);
+        close(); loadFrame(true);
       } catch (err) {
         btn.textContent = err?.message === "auth_cancelled" ? "Login cancelado — tentar novamente" : "Não foi possível entrar — tentar novamente";
-      } finally {
-        btn.disabled = false;
-        setTimeout(() => { if (!btn.disabled && btn.textContent !== original && $("gameplayLoginModal")?.classList.contains("hidden")) btn.textContent = original; }, 1200);
-      }
+      } finally { btn.disabled = false; }
     });
   }
 
@@ -81,44 +98,32 @@
   }
 
   function loadFrame(force = false) {
-    const frame = $("gameplayFrame");
-    const shell = $("gameplayModuleShell");
+    const frame = $("gameplayFrame"), shell = $("gameplayModuleShell");
     if (!frame || !shell) return;
     shell.classList.remove("gameplay-waiting");
-    if (!frameLoaded || force) {
-      frame.src = frameUrl();
-      frameLoaded = true;
-    }
+    if (!frameLoaded || force) { frame.src = frameUrl(); frameLoaded = true; }
   }
 
   async function openGameplay() {
-    removeHeaderGameplayButtons();
-    ensureModal();
+    showGameplayPanel(); removeHeaderGameplayButtons(); ensureModal();
     try {
       const auth = window.DW_AUTH;
       if (!auth) throw new Error("auth_pending");
       await auth.ready;
       if (!auth.getSession?.()?.user) await auth.refreshSession?.();
-      if (!auth.getSession?.()?.user) {
-        $("gameplayLoginModal").classList.remove("hidden");
-        return;
-      }
+      if (!auth.getSession?.()?.user) { $("gameplayLoginModal").classList.remove("hidden"); return; }
       loadFrame();
-    } catch (_) {
-      $("gameplayLoginModal").classList.remove("hidden");
-    }
+    } catch (_) { $("gameplayLoginModal").classList.remove("hidden"); }
   }
 
   function init() {
-    injectStyles();
-    removeHeaderGameplayButtons();
-    ensureModal();
-    const tab = document.querySelector('.tab-btn[data-tab="gameplay"]');
+    injectStyles(); removeHeaderGameplayButtons(); ensureModal();
+    const tab = ensureGameplayDom();
     if (!tab) return;
-    tab.addEventListener("click", () => setTimeout(openGameplay, 0));
-    new MutationObserver(removeHeaderGameplayButtons).observe(document.querySelector(".top-actions") || document.body, { childList: true, subtree: true });
+    tab.addEventListener("click", (e) => { e.preventDefault(); openGameplay(); });
+    const actions = document.querySelector(".top-actions");
+    if (actions) new MutationObserver(removeHeaderGameplayButtons).observe(actions, { childList: true, subtree: true });
   }
 
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init, { once: true });
-  else init();
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init, { once: true }); else init();
 })();
