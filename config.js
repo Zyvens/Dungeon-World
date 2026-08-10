@@ -20,6 +20,14 @@ window.DW_CONFIG = Object.freeze({
     script.defer = true;
     document.head.appendChild(script);
   };
+  const loadCss = (name) => {
+    if ([...document.querySelectorAll('link[rel="stylesheet"]')].some((l) => l.href && l.href.endsWith(`/${name}`))) return;
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = new URL(name, base).href;
+    document.head.appendChild(link);
+  };
+  loadCss("image-actions.css");
   const isGameplay = /(?:^|\/)gameplay\.html$/i.test(location.pathname);
   if (isGameplay) {
     load("gameplay-enhancements.js");
