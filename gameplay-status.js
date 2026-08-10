@@ -1,0 +1,102 @@
+(() => {
+  "use strict";
+
+  const TAB_SELECTOR = '.tab-btn[data-tab="gameplay"]';
+  const STYLE_ID = "gameplayStatusStyles";
+
+  function injectStyles() {
+    if (document.getElementById(STYLE_ID)) return;
+    const style = document.createElement("style");
+    style.id = STYLE_ID;
+    style.textContent = `
+      ${TAB_SELECTOR}.gameplay-tab-highlight{
+        background:color-mix(in srgb,var(--panel) 82%,transparent)!important;
+        color:var(--muted)!important;
+        border-color:rgba(255,255,255,.08)!important;
+        font-weight:inherit!important;
+        box-shadow:none!important;
+        letter-spacing:normal!important;
+        filter:none!important;
+        transform:none!important;
+      }
+      ${TAB_SELECTOR}.gameplay-tab-highlight:hover{
+        filter:none!important;
+        transform:none!important;
+      }
+      ${TAB_SELECTOR}.gameplay-tab-highlight.active{
+        color:#06101a!important;
+        background:var(--accent)!important;
+        border-color:var(--accent)!important;
+        font-weight:800!important;
+        box-shadow:none!important;
+      }
+      ${TAB_SELECTOR}{display:inline-flex;align-items:center;gap:7px}
+      .gameplay-status-dot{width:8px;height:8px;flex:0 0 8px;border-radius:50%;background:#727b86;box-shadow:0 0 0 1px rgba(255,255,255,.08)}
+      .gameplay-status-dot.online{background:#69d391;box-shadow:0 0 0 1px rgba(105,211,145,.2),0 0 10px rgba(105,211,145,.55);animation:dwGameplayPulse 1.6s ease-in-out infinite}
+      @keyframes dwGameplayPulse{0%,100%{transform:scale(.9);opacity:.72;box-shadow:0 0 0 0 rgba(105,211,145,.35)}50%{transform:scale(1.12);opacity:1;box-shadow:0 0 0 5px rgba(105,211,145,0)}}
+      @media(prefers-reduced-motion:reduce){.gameplay-status-dot.online{animation:none}}
+    `;
+    document.head.appendChild(style);
+  }
+
+  function getTab() {
+    return document.querySelector(TAB_SELECTOR);
+  }
+
+  function ensureDot() {
+    const tab = getTab();
+    if (!tab) return null;
+    let dot = tab.querySelector(".gameplay-status-dot");
+    if (!dot) {
+      dot = document.createElement("span");
+      dot.className = "gameplay-status-dot";
+      dot.setAttribute("aria-hidden", "true");
+      tab.prepend(dot);
+    }
+    return dot;
+  }
+
+  function hasRoom() {
+    const code = localStorage.getItem("dw:last-game-code") || "";
+    return /^[A-Z0-9]{8}$/i.test(code.trim());
+  }
+
+  async function isAuthenticated() {
+    try {
+      const auth = window.DW_AUTH;
+      if (!auth) return false;
+      await auth.ready;
+      if (!auth.getSession?.()?.user) await auth.refreshSession?.();
+      return Boolean(auth.getSession?.()?.user);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  async function refresh() {
+    const tab = getTab();
+    const dot = ensureDot();
+    if (!tab || !dot) return;
+    const online = hasRoom() && await isAuthenticated();
+    dot.classList.toggle("online", online);
+    tab.dataset.gameplayStatus = online ? "online" : "offline";
+    tab.title = online ? "Gameplay conectado a uma sala" : "Gameplay sem sala ativa ou sem login";
+    tab.setAttribute("aria-label", online ? "Gameplay — sala ativa" : "Gameplay — sem sala ativa");
+  }
+
+  function init() {
+    injectStyles();
+    const observer = new MutationObserver(() => { ensureDot(); refresh(); });
+    observer.observe(document.querySelector(".tabbar") || document.body, { childList:true, subtree:true });
+    window.addEventListener("storage", (e) => { if (e.key === "dw:last-game-code") refresh(); });
+    window.addEventListener("focus", refresh);
+    window.addEventListener("online", refresh);
+    window.addEventListener("offline", refresh);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
+    setTimeout(refresh, 0);
+    setInterval(refresh, 5000);
+  }
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init, { once:true });
+  else init();
+})();
