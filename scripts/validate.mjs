@@ -40,7 +40,7 @@ const cfg = configSandbox.window.DW_CONFIG;
 assert(cfg?.version === "1.0.0", "config.js: versão de produção precisa ser 1.0.0");
 assert(/^https:\/\//.test(cfg.authUrl), "config.js: authUrl precisa usar HTTPS");
 assert(/^https:\/\//.test(cfg.dataApiUrl), "config.js: dataApiUrl precisa usar HTTPS");
-assert(cfg.neonJsUrl.includes("@neondatabase/neon-js@0.6.3-beta"), "config.js: Neon JS precisa estar fixado em 0.6.3-beta");
+assert(cfg.neonJsUrl.includes("@neondatabase/neon-js@0.6.2-beta"), "config.js: Neon JS precisa estar fixado em 0.6.2-beta");
 assert(cfg.gameplayPollMs >= 500 && cfg.gameplayPollMs <= 1500, "config.js: polling visível fora da faixa de produção");
 assert(cfg.moveThrottleMs >= 200, "config.js: throttle de movimentos está agressivo demais");
 
