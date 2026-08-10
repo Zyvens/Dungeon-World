@@ -3,6 +3,7 @@ name: Validate
 on:
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   validate:
@@ -12,7 +13,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm install --ignore-scripts
       - run: node --check classes.js
       - run: node --check app.js
-      - run: node --check api/sheet.js
+      - run: node --check config.js
+      - run: node --check auth.js
+      - run: node --check data-api.js
+      - run: node --check github-pages-adapter.js
+      - run: node --check gameplay.js
+      - run: node --check sw.js
