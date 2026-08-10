@@ -7,6 +7,20 @@
   }
   function first(v) { return Array.isArray(v) ? v[0] : v; }
 
+  function sanitizeLegacyMessages() {
+    const toast = document.getElementById("toast");
+    if (!toast) return;
+    const clean = () => {
+      if (toast.textContent.includes("DATABASE_URL na Vercel")) {
+        toast.textContent = "Não foi possível sincronizar no Neon. Entre na conta e tente novamente.";
+      }
+    };
+    new MutationObserver(clean).observe(toast, { childList: true, characterData: true, subtree: true });
+    clean();
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", sanitizeLegacyMessages, { once: true });
+  else sanitizeLegacyMessages();
+
   window.fetch = async function(input, init = {}) {
     const raw = typeof input === "string" ? input : input?.url || "";
     let url;
