@@ -14,7 +14,7 @@
 
 ### Arquitetura
 - Autenticação e Data API migradas para o SDK oficial `@neondatabase/neon-js`.
-- SDK fixado em `0.6.3-beta` para builds reproduzíveis.
+- SDK fixado em `0.6.2-beta` para builds reproduzíveis; uma referência inicial a `0.6.3-beta` foi detectada pelo CI como versão não publicada e corrigida antes da liberação.
 - GitHub Pages permanece 100% estático; nenhum segredo de banco é versionado no repositório.
 - Acesso ao Postgres continua restrito por RLS + RPC autenticada.
 
