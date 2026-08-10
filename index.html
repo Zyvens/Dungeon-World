@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1420" />
+  <meta name="description" content="Ficha white-label e editável de Dungeon World." />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>Dungeon World — Ficha White Label</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="styles.css" />
+  <script defer src="classes.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <div id="backgroundLayer" class="background-layer"></div>
+  <div class="background-shade"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">DW</span>
+      <div><strong id="campaignBrand">Dungeon World</strong><small>Ficha White Label</small></div>
+    </div>
+    <div class="top-actions">
+      <span id="cloudStatus" class="cloud-status">Local</span>
+      <button id="cloudBtn" class="btn secondary" type="button">Criar ficha na nuvem</button>
+      <button id="copyLinkBtn" class="btn secondary hidden" type="button">Copiar link</button>
+      <button id="exportBtn" class="btn secondary" type="button">Backup</button>
+      <label class="btn secondary file-label">Importar<input id="importFile" type="file" accept="application/json" hidden /></label>
+    </div>
+  </header>
+
+  <section class="hero shell">
+    <div class="portrait-wrap">
+      <img id="portraitImg" alt="Retrato do personagem" />
+      <label class="image-action">Trocar retrato<input id="portraitInput" type="file" accept="image/*" hidden /></label>
+    </div>
+    <div class="hero-copy">
+      <p class="eyebrow" id="heroCampaign">Dungeon World</p>
+      <input id="characterName" class="hero-name" value="Nome do personagem" aria-label="Nome do personagem" />
+      <div class="tag-row"><span id="heroClass" class="tag">Guerreiro</span><span id="heroHeritage" class="tag muted-tag">Humano</span><span id="heroLevel" class="tag muted-tag">Nível 1</span></div>
+      <textarea id="tagline" class="tagline" rows="2" placeholder="Frase, título ou lema do personagem"></textarea>
+    </div>
+  </section>
+
+  <nav class="tabbar shell" aria-label="Seções da ficha">
+    <button class="tab-btn active" data-tab="ficha">Ficha</button>
+    <button class="tab-btn" data-tab="movimentos">Movimentos</button>
+    <button class="tab-btn" data-tab="equipamento">Equipamento</button>
+    <button class="tab-btn" data-tab="historia">História</button>
+    <button class="tab-btn" data-tab="personagens">Personagens</button>
+    <button class="tab-btn" data-tab="anotacoes">Anotações</button>
+    <button class="tab-btn" data-tab="configuracoes">Configurações</button>
+  </nav>
+
+  <main class="shell panels">
+    <section id="tab-ficha" class="tab-panel active">
+      <div class="grid two">
+        <article class="card">
+          <div class="card-head"><div><h2>Identidade</h2><p>Classe, raça/origem e alinhamento recalculam a ficha.</p></div></div>
+          <div class="form-grid">
+            <label>Classe<select id="classSelect"></select></label>
+            <label id="heritageLabelWrap"><span id="heritageLabel">Raça</span><select id="heritageSelect"></select></label>
+            <label><span id="alignmentLabel">Alinhamento</span><select id="alignmentSelect"></select></label>
+            <label>Aparência<input id="appearance" placeholder="Olhos, cabelo, roupas, corpo..." /></label>
+          </div>
+          <div class="rule-box"><strong id="heritageRuleTitle">Humano</strong><p id="heritageRule"></p></div>
+          <div class="rule-box"><strong id="alignmentRuleTitle">Alinhamento</strong><p id="alignmentRule"></p></div>
+        </article>
+
+        <article class="card">
+          <div class="card-head"><div><h2>Estado</h2><p>PV máximo e carga seguem as fórmulas da classe.</p></div></div>
+          <div class="status-grid">
+            <label>Nível<input id="level" type="number" min="1" max="10" /></label>
+            <label>XP<input id="xp" type="number" min="0" /></label>
+            <label>PV atual<input id="hpCurrent" type="number" min="0" /></label>
+            <label>PV máximo<input id="hpMax" type="number" readonly /></label>
+            <label>Armadura<input id="armor" type="number" min="0" /></label>
+            <label>Dano<input id="damage" readonly /></label>
+            <label class="span-2">Carga atual <span id="loadRule" class="inline-hint"></span><input id="loadCurrent" readonly /></label>
+          </div>
+        </article>
+      </div>
+
+      <article class="card">
+        <div class="card-head"><div><h2>Atributos</h2><p>Distribuição recomendada pelas fichas: 16, 15, 13, 12, 9, 8. O modificador é calculado automaticamente.</p></div></div>
+        <div id="statsGrid" class="stats-grid"></div>
+      </article>
+
+      <div class="grid two">
+        <article class="card">
+          <div class="card-head"><div><h2>Escolhas da classe</h2><p>As opções mudam conforme a classe selecionada.</p></div></div>
+          <div id="setupChoices" class="setup-list"></div>
+        </article>
+        <article class="card">
+          <div class="card-head"><div><h2>Vínculos</h2><p>Registre relações importantes com os companheiros.</p></div></div>
+          <div id="bondsList" class="stack"></div>
+          <button id="addBondBtn" class="btn secondary" type="button">+ Vínculo</button>
+        </article>
+      </div>
+    </section>
+
+    <section id="tab-movimentos" class="tab-panel">
+      <article class="card">
+        <div class="card-head"><div><h2>Movimentos iniciais</h2><p id="moveIntro">Movimentos concedidos pela classe.</p></div></div>
+        <div id="startingMoves" class="move-list"></div>
+      </article>
+      <article class="card">
+        <div class="card-head"><div><h2>Movimentos avançados</h2><p>Marque os adquiridos. A disponibilidade segue a lista da classe escolhida.</p></div></div>
+        <div id="advancedMoves" class="advanced-grid"></div>
+        <label class="block-label">Observações sobre movimentos<textarea id="advancedNotes" rows="6"></textarea></label>
+      </article>
+    </section>
+
+    <section id="tab-equipamento" class="tab-panel">
+      <article class="card">
+        <div class="card-head"><div><h2>Equipamento</h2><p id="equipmentGuide"></p></div><button id="addEquipmentBtn" class="btn" type="button">+ Equipamento</button></div>
+        <div class="load-line"><strong id="loadText">Carga 0 / 0</strong><div class="meter"><span id="loadMeter"></span></div></div>
+        <div id="equipmentList" class="equipment-list"></div>
+      </article>
+    </section>
+
+    <section id="tab-historia" class="tab-panel">
+      <article class="card">
+        <div class="card-head"><div><h2>História & background</h2><p>Campo livre para origem, campanha, profecias, objetivos e acontecimentos.</p></div></div>
+        <textarea id="story" class="large-textarea" placeholder="Escreva a história do personagem..."></textarea>
+      </article>
+    </section>
+
+    <section id="tab-personagens" class="tab-panel">
+      <article class="card">
+        <div class="card-head"><div><h2>Personagens</h2><p>NPCs, aliados, rivais e figuras importantes.</p></div><button id="addPersonBtn" class="btn" type="button">+ Personagem</button></div>
+        <div id="peopleList" class="people-list"></div>
+      </article>
+    </section>
+
+    <section id="tab-anotacoes" class="tab-panel">
+      <article class="card notes-card">
+        <div class="card-head"><div><h2>Anotações</h2><p>Editor livre com salvamento automático.</p></div></div>
+        <div class="editor-toolbar" role="toolbar">
+          <button type="button" data-cmd="bold"><b>B</b></button>
+          <button type="button" data-cmd="italic"><i>I</i></button>
+          <button type="button" data-cmd="underline"><u>U</u></button>
+          <button type="button" data-cmd="formatBlock" data-value="blockquote">Citação</button>
+          <button type="button" id="spoilerBtn">Spoiler</button>
+          <select id="fontSizeSelect" aria-label="Tamanho da fonte"><option value="3">Normal</option><option value="2">Pequeno</option><option value="4">Grande</option><option value="5">Maior</option></select>
+          <input id="fontColor" type="color" value="#e7edf5" title="Cor da fonte" />
+        </div>
+        <div id="notesEditor" class="notes-editor" contenteditable="true" data-placeholder="Anotações da sessão..."></div>
+      </article>
+    </section>
+
+    <section id="tab-configuracoes" class="tab-panel">
+      <div class="grid two">
+        <article class="card">
+          <div class="card-head"><div><h2>Identidade visual</h2><p>White label do personagem/campanha.</p></div></div>
+          <div class="form-grid">
+            <label>Nome da campanha<input id="campaignName" /></label>
+            <label>Cor principal<input id="primaryColor" type="color" /></label>
+            <label>Cor de destaque<input id="accentColor" type="color" /></label>
+            <label>Cor dos painéis<input id="panelColor" type="color" /></label>
+            <label>Cor do texto<input id="textColor" type="color" /></label>
+            <label>Escala de fonte<input id="fontScale" type="range" min="0.85" max="1.25" step="0.05" /></label>
+            <label>Opacidade dos painéis<input id="panelOpacity" type="range" min="0.55" max="1" step="0.05" /></label>
+            <label>Escurecimento do fundo<input id="backgroundShade" type="range" min="0" max="0.85" step="0.05" /></label>
+          </div>
+          <div class="button-row"><label class="btn secondary file-label">Trocar fundo<input id="backgroundInput" type="file" accept="image/*" hidden /></label><button id="removeBackgroundBtn" class="btn secondary" type="button">Remover fundo</button><button id="resetThemeBtn" class="btn secondary" type="button">Tema padrão</button></div>
+        </article>
+        <article class="card">
+          <div class="card-head"><div><h2>Dados</h2><p>Persistência local + Neon.</p></div></div>
+          <p>O app salva automaticamente neste dispositivo. Para usar a mesma ficha em celular e PC, crie uma ficha na nuvem e guarde o link completo de edição.</p>
+          <div class="button-row"><button id="saveCloudBtn" class="btn" type="button">Salvar agora na nuvem</button><button id="resetSheetBtn" class="btn danger" type="button">Nova ficha genérica</button></div>
+          <p id="sheetIdentity" class="mono small"></p>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <template id="equipmentTemplate">
+    <div class="equipment-row">
+      <input data-k="name" placeholder="Nome" />
+      <textarea data-k="description" rows="2" placeholder="Descrição"></textarea>
+      <label>Peso<input data-k="weight" type="number" min="0" step="0.1" /></label>
+      <label>Qtd.<input data-k="quantity" type="number" min="0" step="1" /></label>
+      <button class="icon-btn danger" data-action="remove" type="button">×</button>
+    </div>
+  </template>
+
+  <template id="personTemplate">
+    <div class="person-row">
+      <div class="person-image"><img alt="Imagem do personagem" /><label>Imagem<input data-k="imageInput" type="file" accept="image/*" hidden /></label></div>
+      <div class="person-fields"><input data-k="name" placeholder="Nome" /><input data-k="role" placeholder="Relação / papel" /><textarea data-k="description" rows="4" placeholder="Anotações"></textarea></div>
+      <button class="icon-btn danger" data-action="remove" type="button">×</button>
+    </div>
+  </template>
+
+  <div id="toast" class="toast" aria-live="polite"></div>
+</body>
+</html>
