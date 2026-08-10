@@ -2,7 +2,7 @@ const DW_AUTH = (() => {
   "use strict";
 
   const cfg = window.DW_CONFIG || {};
-  const SDK_URL = cfg.neonJsUrl || "https://esm.sh/@neondatabase/neon-js@0.6.3-beta?bundle&target=es2022";
+  const SDK_URL = cfg.neonJsUrl || "https://esm.sh/@neondatabase/neon-js@0.6.2-beta?bundle&target=es2022";
   let client = null;
   let session = null;
   let waiters = [];
@@ -202,10 +202,7 @@ const DW_AUTH = (() => {
     try {
       if (!cfg.authUrl || !cfg.dataApiUrl) throw new Error("Endpoints Neon não configurados.");
       const { createClient } = await import(SDK_URL);
-      client = createClient({
-        auth: { url: cfg.authUrl },
-        dataApi: { url: cfg.dataApiUrl }
-      });
+      client = createClient({ auth: { url: cfg.authUrl }, dataApi: { url: cfg.dataApiUrl } });
       window.DW_NEON = client;
       if (document.readyState === "loading") await new Promise((resolve) => document.addEventListener("DOMContentLoaded", resolve, { once: true }));
       buildUI();
@@ -222,15 +219,7 @@ const DW_AUTH = (() => {
   }
 
   const ready = init();
-  return {
-    ready,
-    ensureSignedIn,
-    refreshSession,
-    getSession: () => session,
-    getClient: () => client,
-    openModal,
-    logout
-  };
+  return { ready, ensureSignedIn, refreshSession, getSession: () => session, getClient: () => client, openModal, logout };
 })();
 
 window.DW_AUTH = DW_AUTH;
