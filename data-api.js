@@ -55,4 +55,8 @@
   }
 
   window.DW_API = { rpc, nativeFetch };
+
+  const path = location.pathname.toLowerCase();
+  const enhancement = path.endsWith("/gameplay.html") || path.endsWith("gameplay.html") ? "./gameplay-enhancements.js" : "./sheet-enhancements.js";
+  import(enhancement).catch((err) => console.warn("Melhorias de interface não carregadas", err));
 })();
