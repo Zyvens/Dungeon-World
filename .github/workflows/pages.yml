@@ -34,7 +34,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for file in classes.js class-rules.js app.js config.js auth.js data-api.js github-pages-adapter.js gameplay.js sw.js scripts/validate.mjs; do
+          for file in classes.js class-rules.js sheet-enhancements.js sheet-media-refresh.js app.js config.js auth.js data-api.js github-pages-adapter.js gameplay.js gameplay-enhancements.js sw.js scripts/validate.mjs; do
             node --check "$file"
           done
           node scripts/validate.mjs
