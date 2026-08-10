@@ -1,4 +1,4 @@
-const CACHE = "dungeon-world-v1.0.0-ui8";
+const CACHE = "dungeon-world-v1.0.0-ui9";
 const BASE = self.registration.scope;
 const CORE = [
   "",
@@ -17,6 +17,7 @@ const CORE = [
   "sheet-media-refresh.js",
   "gameplay-tab.js",
   "gameplay-status.js",
+  "blank-sheet-reset.js",
   "gameplay-enhancements.js",
   "app.js",
   "gameplay.js",
