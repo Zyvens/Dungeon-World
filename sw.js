@@ -1,4 +1,4 @@
-const CACHE = "dungeon-world-white-label-v3";
+const CACHE = "dungeon-world-v1.0.0";
 const BASE = self.registration.scope;
 const CORE = [
   "",
@@ -11,6 +11,7 @@ const CORE = [
   "data-api.js",
   "github-pages-adapter.js",
   "classes.js",
+  "class-rules.js",
   "app.js",
   "gameplay.js",
   "manifest.webmanifest",
@@ -19,11 +20,7 @@ const CORE = [
 const FALLBACK = new URL("index.html", BASE).href;
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE)
-      .then((cache) => cache.addAll(CORE))
-      .then(() => self.skipWaiting())
-  );
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(CORE)).then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", (event) => {
