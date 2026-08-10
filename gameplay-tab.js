@@ -8,6 +8,9 @@
     const s = document.createElement("style");
     s.id = "gameplayTabStyles";
     s.textContent = `
+      .tab-btn.gameplay-tab-highlight{background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 92%,white 8%),color-mix(in srgb,var(--accent) 72%,#0b1420 28%));color:#06101a;border-color:color-mix(in srgb,var(--accent) 88%,white 12%);font-weight:900;box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 28%,transparent),0 8px 24px color-mix(in srgb,var(--accent) 22%,transparent);letter-spacing:.01em}
+      .tab-btn.gameplay-tab-highlight:hover{filter:brightness(1.08);transform:translateY(-1px)}
+      .tab-btn.gameplay-tab-highlight.active{background:color-mix(in srgb,var(--accent) 86%,white 14%);color:#06101a;box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 35%,transparent),0 10px 30px color-mix(in srgb,var(--accent) 30%,transparent)}
       .gameplay-module-card{padding:0;overflow:hidden}
       .gameplay-module-head{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 18px;border-bottom:1px solid rgba(255,255,255,.08)}
       .gameplay-module-head h2{margin:0}.gameplay-module-head p{margin:3px 0 0;color:var(--muted);font-size:.8rem}
@@ -31,19 +34,21 @@
     if (!tab) {
       tab = document.createElement("button");
       tab.type = "button";
-      tab.className = "tab-btn";
+      tab.className = "tab-btn gameplay-tab-highlight";
       tab.dataset.tab = "gameplay";
       tab.textContent = "Gameplay";
-      const settings = tabbar.querySelector('[data-tab="configuracoes"]');
-      tabbar.insertBefore(tab, settings || null);
     }
+    tab.classList.add("gameplay-tab-highlight");
+    const sheetTab = tabbar.querySelector('[data-tab="ficha"]');
+    tabbar.insertBefore(tab, sheetTab || tabbar.firstChild);
+
     if (!$("tab-gameplay")) {
       const panel = document.createElement("section");
       panel.id = "tab-gameplay";
       panel.className = "tab-panel";
       panel.innerHTML = `<article class="card gameplay-module-card"><div class="gameplay-module-head"><div><h2>Gameplay compartilhado</h2><p>A sala abre dentro da ficha. Trocar de aba não desconecta você da partida.</p></div><span class="tag muted-tag">quase em tempo real</span></div><div id="gameplayModuleShell" class="gameplay-module-shell gameplay-waiting"><iframe id="gameplayFrame" class="gameplay-frame" title="Gameplay compartilhado" loading="lazy" allow="clipboard-write"></iframe></div></article>`;
-      const settingsPanel = $("tab-configuracoes");
-      panels.insertBefore(panel, settingsPanel || null);
+      const sheetPanel = $("tab-ficha");
+      panels.insertBefore(panel, sheetPanel || panels.firstChild);
     }
     return tab;
   }
