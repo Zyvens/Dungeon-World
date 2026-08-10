@@ -4,10 +4,19 @@
   const nativeFetch = window.fetch.bind(window);
   window.DW_NATIVE_FETCH = nativeFetch;
 
+  async function authModule() {
+    for (let i = 0; i < 80 && !window.DW_AUTH; i += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    if (!window.DW_AUTH) throw new Error("Módulo de autenticação indisponível.");
+    await window.DW_AUTH.ready;
+    return window.DW_AUTH;
+  }
+
   async function rpc(name, args = {}, options = {}) {
     const interactive = options.interactive !== false;
-    if (!window.DW_AUTH) throw new Error("Módulo de autenticação indisponível.");
-    const jwt = await window.DW_AUTH.getJwt({ interactive });
+    const auth = await authModule();
+    const jwt = await auth.getJwt({ interactive });
     if (!jwt) throw new Error("Autenticação necessária.");
     const res = await nativeFetch(`${cfg.dataApiUrl}/rpc/${encodeURIComponent(name)}`, {
       method: "POST",
