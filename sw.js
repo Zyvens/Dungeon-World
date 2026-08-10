@@ -1,4 +1,4 @@
-const CACHE = "dungeon-world-v1.0.0-ui3";
+const CACHE = "dungeon-world-v1.0.0-ui4";
 const BASE = self.registration.scope;
 const CORE = [
   "",
@@ -12,6 +12,8 @@ const CORE = [
   "github-pages-adapter.js",
   "classes.js",
   "class-rules.js",
+  "sheet-enhancements.js",
+  "gameplay-enhancements.js",
   "app.js",
   "gameplay.js",
   "manifest.webmanifest",
