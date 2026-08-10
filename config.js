@@ -8,3 +8,24 @@ window.DW_CONFIG = Object.freeze({
   presencePollMs: 5000,
   moveThrottleMs: 280
 });
+
+(() => {
+  "use strict";
+  const here = document.currentScript?.src || location.href;
+  const base = new URL(".", here);
+  const load = (name) => {
+    if ([...document.scripts].some((s) => s.src && s.src.endsWith(`/${name}`))) return;
+    const script = document.createElement("script");
+    script.src = new URL(name, base).href;
+    script.defer = true;
+    document.head.appendChild(script);
+  };
+  const isGameplay = /(?:^|\/)gameplay\.html$/i.test(location.pathname);
+  if (isGameplay) {
+    load("gameplay-enhancements.js");
+  } else {
+    load("sheet-media-refresh.js");
+    load("sheet-enhancements.js");
+    load("gameplay-tab.js");
+  }
+})();
