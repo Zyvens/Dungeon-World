@@ -1,11 +1,11 @@
 (() => {
   "use strict";
-  const cfg = window.DW_CONFIG || {};
+
   const nativeFetch = window.fetch.bind(window);
   window.DW_NATIVE_FETCH = nativeFetch;
 
   async function authModule() {
-    for (let i = 0; i < 80 && !window.DW_AUTH; i += 1) {
+    for (let i = 0; i < 100 && !window.DW_AUTH; i += 1) {
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
     if (!window.DW_AUTH) throw new Error("Módulo de autenticação indisponível.");
@@ -13,32 +13,45 @@
     return window.DW_AUTH;
   }
 
-  async function rpc(name, args = {}, options = {}) {
-    const interactive = options.interactive !== false;
+  function apiError(error, fallback = "Falha ao acessar o Neon Data API.") {
+    const err = new Error(error?.message || error?.details || error?.hint || error?.code || fallback);
+    err.code = error?.code;
+    err.details = error?.details;
+    err.hint = error?.hint;
+    err.status = Number(error?.status || error?.statusCode || 0) || undefined;
+    if (!err.status && (err.code === "42501" || err.code === "28000")) err.status = err.code === "28000" ? 401 : 403;
+    err.payload = error;
+    return err;
+  }
+
+  async function getClient(interactive) {
     const auth = await authModule();
-    const jwt = await auth.getJwt({ interactive });
-    if (!jwt) throw new Error("Autenticação necessária.");
-    const res = await nativeFetch(`${cfg.dataApiUrl}/rpc/${encodeURIComponent(name)}`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${jwt}`,
-        "Content-Type": "application/json",
-        "Accept": "application/json"
-      },
-      body: JSON.stringify(args),
-      cache: "no-store"
-    });
-    const text = await res.text();
-    let data = null;
-    try { data = text ? JSON.parse(text) : null; } catch (_) { data = text; }
-    if (!res.ok) {
-      const msg = data?.message || data?.hint || data?.details || (typeof data === "string" ? data : `HTTP ${res.status}`);
-      const err = new Error(msg);
-      err.status = res.status;
-      err.payload = data;
+    if (interactive) await auth.ensureSignedIn();
+    else if (!auth.getSession()?.user) await auth.refreshSession();
+
+    if (!auth.getSession()?.user) {
+      const err = new Error("Autenticação necessária.");
+      err.status = 401;
       throw err;
     }
-    return data;
+
+    const client = auth.getClient?.() || window.DW_NEON;
+    if (!client) throw new Error("Cliente Neon indisponível.");
+    return { auth, client };
+  }
+
+  async function rpc(name, args = {}, options = {}) {
+    const interactive = options.interactive !== false;
+    const { auth, client } = await getClient(interactive);
+
+    let result = await client.rpc(name, args);
+    if (result?.error && (result.error.status === 401 || result.error.code === "28000")) {
+      await auth.refreshSession();
+      if (auth.getSession()?.user) result = await client.rpc(name, args);
+    }
+
+    if (result?.error) throw apiError(result.error);
+    return result?.data ?? null;
   }
 
   window.DW_API = { rpc, nativeFetch };

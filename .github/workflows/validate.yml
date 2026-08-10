@@ -5,19 +5,56 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          node-version: 20
-      - run: node --check classes.js
-      - run: node --check app.js
-      - run: node --check config.js
-      - run: node --check auth.js
-      - run: node --check data-api.js
-      - run: node --check github-pages-adapter.js
-      - run: node --check gameplay.js
-      - run: node --check sw.js
+          node-version: 24
+
+      - name: JavaScript syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in classes.js class-rules.js app.js config.js auth.js data-api.js github-pages-adapter.js gameplay.js sw.js scripts/validate.mjs; do
+            node --check "$file"
+          done
+
+      - name: Structural, security and rules validation
+        run: node scripts/validate.mjs
+
+      - name: Neon SDK CDN is reachable
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error \
+            'https://esm.sh/@neondatabase/neon-js@0.6.2-beta?bundle&target=es2022' \
+            --output /tmp/neon-js.mjs
+          test -s /tmp/neon-js.mjs
+
+      - name: Browser smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m http.server 8080 --bind 127.0.0.1 >/tmp/dw-http.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID || true' EXIT
+          sleep 1
+          CHROME="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          test -n "$CHROME"
+          "$CHROME" --headless=new --no-sandbox --disable-gpu --virtual-time-budget=5000 \
+            --dump-dom http://127.0.0.1:8080/index.html >/tmp/index-dom.html
+          grep -Fq '<title>Nome do personagem — Dungeon World</title>' /tmp/index-dom.html
+          "$CHROME" --headless=new --no-sandbox --disable-gpu --virtual-time-budget=3000 \
+            --dump-dom http://127.0.0.1:8080/gameplay.html >/tmp/gameplay-dom.html
+          grep -Fq 'placeholder="6 a 8 números"' /tmp/gameplay-dom.html
+          grep -Fq 'Gameplay compartilhado' /tmp/gameplay-dom.html

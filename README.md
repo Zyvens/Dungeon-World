@@ -1,74 +1,106 @@
 # Dungeon World — Ficha White Label
 
-Aplicação web/PWA baseada no projeto `Zyvens/RPG-Dungeon-World`, reconstruída como uma ficha genérica e personalizável para personagens de Dungeon World, agora publicada como site estático no **GitHub Pages** e sincronizada diretamente com **Neon Auth + Neon Data API**.
+**Versão de produção: 1.0.0**
 
-## O que o projeto oferece
+Aplicação web/PWA baseada no projeto `Zyvens/RPG-Dungeon-World`, reconstruída como ficha genérica e personalizável de Dungeon World. O frontend é publicado no **GitHub Pages** e usa **Neon Auth + Neon Data API** para autenticação e persistência, sem Vercel e sem credencial administrativa no navegador.
 
-- Nenhuma referência a Kael Frostborn no estado inicial.
-- Construção orientada por classe, raça/origem, alinhamento e regras específicas da classe.
-- Classes disponíveis conforme o manual utilizado no projeto: Bardo, Bárbaro, Clérigo, Druida, Engenheiro Arcano, Guerreiro, Ladrão, Mago, Paladino e Ranger.
-- White label: cores, fundo, retrato, escala de fonte, transparência dos painéis e identidade da campanha/personagem.
-- Inventário com peso/quantidade e cálculo automático de carga.
-- Personagens/NPCs, história e anotações ricas.
-- Conta por jogador com Neon Auth.
-- Ficha individual sincronizada pelo Neon.
-- **Gameplay compartilhado** com código de sala, PIN, mapa, grade, bonecos/tokens e participantes online.
-- PWA instalável e preparada para o caminho de projeto do GitHub Pages.
+## Recursos
+
+- Ficha genérica, sem dados específicos de Kael Frostborn no estado inicial.
+- 10 classes: Bardo, Bárbaro, Clérigo, Druida, Engenheiro Arcano, Guerreiro, Ladrão, Mago, Paladino e Ranger.
+- Classe, raça/origem/especialização e alinhamento/motivação alteram os textos e regras exibidos.
+- PV máximo, dado de dano e carga calculados pelas regras da classe.
+- Movimentos avançados separados por disponibilidade de nível 2–5 e 6–10; Ranger sinaliza `Meio-Elfo` como movimento do primeiro avanço.
+- White label: cores, fundo, retrato, escala de fonte, transparência dos painéis e nome da campanha.
+- Inventário com peso × quantidade e aviso explícito de sobrecarga.
+- Personagens/NPCs, vínculos, história e anotações ricas com citação e spoiler.
+- Backup/importação com normalização e sanitização de conteúdo.
+- Ficha individual com persistência local e sincronização opcional na nuvem.
+- **Gameplay compartilhado** com sala, PIN, mapa, grade, tokens e presença aproximada.
+- PWA compatível com o subdiretório do GitHub Pages.
 
 ## GitHub Pages
 
-O deploy é feito pelo workflow `.github/workflows/pages.yml`. Para a primeira publicação, abra no GitHub:
+O deploy é feito por `.github/workflows/pages.yml`. Antes de publicar, o workflow executa a validação de produção; um build inválido não é enviado ao Pages.
+
+Na primeira ativação do repositório, configure:
 
 **Settings → Pages → Build and deployment → Source → GitHub Actions**
 
-Depois disso, cada `push` em `main` publica automaticamente a versão atual do repositório.
+Depois, cada `push` válido em `main` publica automaticamente.
 
-Endereço esperado deste repositório:
+Endereços esperados:
 
-`https://zyvens.github.io/Dungeon-World/`
+- Ficha: `https://zyvens.github.io/Dungeon-World/`
+- Gameplay: `https://zyvens.github.io/Dungeon-World/gameplay.html`
 
-O Gameplay também pode ser aberto diretamente em:
+## Neon
 
-`https://zyvens.github.io/Dungeon-World/gameplay.html`
+O projeto usa os endpoints públicos de Neon Auth e Neon Data API definidos em `config.js`. A aplicação usa o SDK oficial `@neondatabase/neon-js`, com versão fixada no frontend.
 
-Não há Vercel, função serverless própria nem `DATABASE_URL` no GitHub Pages.
+A connection string administrativa do Postgres não é publicada. As tabelas de aplicação têm RLS habilitado, sem SELECT/UPDATE direto para clientes autenticados. O navegador acessa somente RPCs liberadas para as operações necessárias.
 
-## Neon: autenticação e persistência
+### Ficha individual
 
-O projeto Neon utilizado é `dungeon-world`. O navegador usa somente os endpoints públicos do **Neon Auth** e da **Neon Data API** definidos em `config.js`; a connection string administrativa do Postgres não é publicada no repositório.
-
-A Data API valida o JWT emitido pelo Neon Auth. As tabelas internas têm RLS habilitado e acesso direto revogado para clientes. O navegador executa apenas as funções RPC liberadas especificamente para as operações da ficha e do Gameplay.
-
-A ficha individual continua usando uma chave de edição própria. O adaptador `github-pages-adapter.js` preserva a interface já usada por `app.js`, mas encaminha as operações ao Neon Data API em vez de depender de um backend da hospedagem.
+Cada ficha na nuvem recebe um ID e uma chave de edição. A chave completa permanece no fragmento da URL (`#key=...`). Sem chave, alterações são tratadas como locais até o usuário criar uma cópia editável.
 
 ## Gameplay compartilhado
 
-Cada partida possui um **código de 8 caracteres** e um **PIN de 4 a 8 dígitos**. O criador entra automaticamente. Uma nova conta informa código + PIN uma vez; após a validação, essa conta passa a ser membro daquela partida.
+Cada partida tem:
 
-Todos os membros da mesma partida enxergam o mesmo:
+- código de 8 caracteres;
+- PIN;
+- membros vinculados por conta;
+- estado compartilhado do mapa;
+- tokens compartilhados e suas posições.
 
-- mapa e enquadramento;
-- grade e tamanho da grade;
-- lista de bonecos/tokens;
-- imagens, nomes, cores e tamanhos dos tokens;
-- posições dos tokens;
+**Novas partidas exigem PIN de 6 a 8 dígitos.** A entrada aceita 4 a 8 dígitos para manter compatibilidade com salas anteriores.
+
+O criador entra automaticamente. Uma nova conta informa código + PIN uma vez; depois fica associada à sala. O link compartilhado contém somente o código (`?game=...`), nunca o PIN.
+
+Todos os membros da mesma sala enxergam o mesmo:
+
+- mapa, enquadramento, grade e tamanho da grade;
 - título da partida;
-- lista aproximada de participantes online.
+- lista, imagens, nomes, cores e tamanhos dos tokens;
+- posições dos tokens;
+- participantes vistos recentemente como online.
 
-Qualquer membro da partida pode mover os bonecos. Durante o arraste, a posição é enviada de forma limitada para evitar excesso de requisições e confirmada novamente ao soltar. Os demais navegadores consultam versões leves do estado em intervalos curtos e baixam somente a parte que mudou. Na prática, o tabuleiro converge normalmente em cerca de **um segundo**, dependendo da rede.
+Qualquer membro pode mover os tokens. Com a aba visível, o cliente consulta versões leves do estado aproximadamente a cada 750 ms e envia posições durante o arraste com throttle, confirmando a posição final ao soltar. Em segundo plano o polling é reduzido para economizar requisições. O modelo é **quase em tempo real por polling**, não WebSocket.
 
-O link compartilhado contém o código da partida (`?game=...`), mas não inclui o PIN. Recomenda-se enviar o PIN separadamente.
+## Estrutura do banco
 
-## Estrutura de sincronização
+Gameplay:
 
-O banco usa três estruturas principais para o Gameplay:
+- `gameplay_sessions`: mapa e contadores de versão;
+- `gameplay_members`: autorização da conta e presença;
+- `gameplay_tokens`: metadados e coordenadas.
 
-- `gameplay_sessions`: estado do mapa e contadores de versão;
-- `gameplay_members`: contas autorizadas na partida e presença recente;
-- `gameplay_tokens`: metadados e coordenadas dos bonecos.
+Ficha:
 
-As posições são armazenadas em percentual do tabuleiro, então jogadores em telas de tamanhos diferentes enxergam os tokens no mesmo ponto relativo.
+- `character_sheets`: estado JSON e hash da chave de edição.
 
-## Referência de regras
+As posições dos tokens são percentuais, mantendo o mesmo ponto relativo em telas diferentes.
 
-Os dados de classe foram modelados a partir dos manuais em PT-BR fornecidos para o projeto. As regras de classe controlam PV máximo, dado de dano, carga, raça/origem disponível, alinhamentos, movimentos iniciais e lista de movimentos avançados.
+## Validação de produção
+
+`node scripts/validate.mjs` verifica, entre outros pontos:
+
+- arquivos obrigatórios e referências locais;
+- ausência de dependências/mensagens legadas de Vercel;
+- configuração HTTPS e versão fixa do Neon JS;
+- presença das 10 classes, bases de PV/dano/carga e cortes de nível dos movimentos;
+- proteção contra regressão de PV atual igual a zero;
+- sanitização das anotações;
+- mecanismos essenciais de sincronização do Gameplay;
+- escopo relativo do PWA e conteúdo do cache do service worker.
+
+O CI também executa `node --check`, verifica a disponibilidade do SDK e abre ficha/Gameplay em Chrome headless como smoke test.
+
+O banco foi validado com teste de integração para: criação de sala, PIN incorreto, entrada de segunda conta, isolamento antes da associação, mapa, criação/movimento de token, versões de sincronização e ciclo completo de criação/leitura/atualização de ficha com rejeição de chave inválida.
+
+## Referência das regras
+
+Os dados de classe foram modelados a partir dos manuais PT-BR fornecidos ao projeto. Alterações de regra devem preservar a terminologia e a estrutura desses materiais.
+
+Consulte `CHANGELOG.md` para as correções e melhorias da versão 1.0.0.
