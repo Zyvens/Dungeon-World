@@ -19,7 +19,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
 
       - name: JavaScript syntax
         shell: bash
@@ -37,7 +37,7 @@ jobs:
         run: |
           set -euo pipefail
           curl --fail --location --silent --show-error \
-            'https://esm.sh/@neondatabase/neon-js@0.6.3-beta?bundle&target=es2022' \
+            'https://esm.sh/@neondatabase/neon-js@0.6.2-beta?bundle&target=es2022' \
             --output /tmp/neon-js.mjs
           test -s /tmp/neon-js.mjs
 
