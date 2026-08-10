@@ -17,6 +17,8 @@ window.DW_CONFIG = Object.freeze({
   const here = document.currentScript?.src || location.href;
   const base = new URL(".", here);
   const STORAGE_KEY = "dungeon-world:white-label:v2";
+  const MEDIA_KEY = "dungeon-world:white-label:media:v1";
+  const RESET_FLAG = "dw:blank-reset-pending";
 
   const BLANK_STATE = {
     version: 3,
@@ -30,6 +32,21 @@ window.DW_CONFIG = Object.freeze({
     images: { portrait: null },
     theme: { campaignName:"Dungeon World", primary:"#0b1420", accent:"#8bc7ee", panel:"#101b29", text:"#e7edf5", fontScale:1, panelOpacity:.9, shade:.52, backgroundImage:null }
   };
+
+  // A pending reset is reapplied synchronously before app.js reads localStorage.
+  // This prevents an already-scheduled autosave from restoring the old sheet during navigation.
+  try {
+    const pendingRaw = sessionStorage.getItem(RESET_FLAG);
+    if (pendingRaw) {
+      const pending = JSON.parse(pendingRaw);
+      if (pending?.state && typeof pending.state === "object") localStorage.setItem(STORAGE_KEY, JSON.stringify(pending.state));
+      if (pending?.media && typeof pending.media === "object") localStorage.setItem(MEDIA_KEY, JSON.stringify({
+        equipment: pending.media.equipment && typeof pending.media.equipment === "object" ? pending.media.equipment : {},
+        history: Array.isArray(pending.media.history) ? pending.media.history : []
+      }));
+      sessionStorage.removeItem(RESET_FLAG);
+    }
+  } catch (_) {}
 
   let classRegistry = window.DW_CLASSES;
   try {
