@@ -1,12 +1,17 @@
 {
   "name": "Dungeon World — Ficha White Label",
   "short_name": "Dungeon World",
-  "description": "Ficha personalizável e sincronizável de Dungeon World.",
-  "start_url": "/",
+  "description": "Ficha personalizável e Gameplay compartilhado de Dungeon World.",
+  "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#0b1420",
   "theme_color": "#0b1420",
   "icons": [
-    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Ficha", "short_name": "Ficha", "url": "index.html" },
+    { "name": "Gameplay", "short_name": "Gameplay", "url": "gameplay.html" }
   ]
 }
