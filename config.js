@@ -27,6 +27,15 @@ window.DW_CONFIG = Object.freeze({
     link.href = new URL(name, base).href;
     document.head.appendChild(link);
   };
+
+  const STORAGE_KEY = "dungeon-world:white-label:v2";
+  if (!localStorage.getItem(STORAGE_KEY)) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      version: 3,
+      stats: { strength: 0, dexterity: 0, constitution: 0, intelligence: 0, wisdom: 0, charisma: 0 }
+    }));
+  }
+
   loadCss("image-actions.css");
   const isGameplay = /(?:^|\/)gameplay\.html$/i.test(location.pathname);
   if (isGameplay) {
