@@ -57,6 +57,9 @@
   window.DW_API = { rpc, nativeFetch };
 
   const path = location.pathname.toLowerCase();
-  const enhancement = path.endsWith("/gameplay.html") || path.endsWith("gameplay.html") ? "./gameplay-enhancements.js" : "./sheet-enhancements.js";
-  import(enhancement).catch((err) => console.warn("Melhorias de interface não carregadas", err));
+  if (path.endsWith("/gameplay.html") || path.endsWith("gameplay.html")) {
+    import("./gameplay-enhancements.js").catch((err) => console.warn("Melhorias do Gameplay não carregadas", err));
+  } else {
+    Promise.all([import("./sheet-enhancements.js"), import("./sheet-media-refresh.js")]).catch((err) => console.warn("Melhorias da ficha não carregadas", err));
+  }
 })();
