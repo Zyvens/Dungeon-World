@@ -44,5 +44,6 @@ window.DW_CONFIG = Object.freeze({
     load("sheet-media-refresh.js");
     load("sheet-enhancements.js");
     load("gameplay-tab.js");
+    load("gameplay-status.js");
   }
 })();
