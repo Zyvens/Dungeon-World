@@ -20,15 +20,37 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Production validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in classes.js class-rules.js app.js config.js auth.js data-api.js github-pages-adapter.js gameplay.js sw.js scripts/validate.mjs; do
+            node --check "$file"
+          done
+          node scripts/validate.mjs
+          curl --fail --location --silent --show-error \
+            'https://esm.sh/@neondatabase/neon-js@0.6.3-beta?bundle&target=es2022' \
+            --output /tmp/neon-js.mjs
+          test -s /tmp/neon-js.mjs
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
+
       - name: Upload static site
         uses: actions/upload-pages-artifact@v4
         with:
           path: .
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
