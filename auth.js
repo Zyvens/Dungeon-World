@@ -2,7 +2,7 @@ const DW_AUTH = (() => {
   "use strict";
 
   const cfg = window.DW_CONFIG || {};
-  const SDK_URL = cfg.neonJsUrl || "https://esm.sh/@neondatabase/neon-js@0.6.2-beta?bundle&target=es2022";
+  const SDK_URL = cfg.neonJsUrl || "https://esm.sh/@neondatabase/neon-js@0.7.0-beta?bundle&target=es2022";
   let client = null;
   let session = null;
   let waiters = [];
@@ -149,12 +149,17 @@ const DW_AUTH = (() => {
     }
   }
 
-  async function refreshSession() {
+  async function refreshSession(attempts = 1) {
     if (!client) return null;
-    try {
-      session = normalizeSession(await client.auth.getSession());
-    } catch (_) {
-      session = null;
+    session = null;
+    for (let i = 0; i < Math.max(1, attempts); i += 1) {
+      try {
+        session = normalizeSession(await client.auth.getSession());
+      } catch (_) {
+        session = null;
+      }
+      if (session?.user) break;
+      if (i + 1 < attempts) await new Promise((resolve) => setTimeout(resolve, 160 * (i + 1)));
     }
     renderAccount();
     return session;
@@ -172,7 +177,8 @@ const DW_AUTH = (() => {
         ? await client.auth.signUp.email({ email, password, name })
         : await client.auth.signIn.email({ email, password });
       if (result?.error) throw new Error(errorMessage(result));
-      await refreshSession();
+      session = normalizeSession(result) || session;
+      if (!session?.user) await refreshSession(4);
       if (!session?.user) throw new Error("A sessão não pôde ser confirmada.");
       renderAccount();
       modal.classList.add("hidden");
@@ -192,7 +198,7 @@ const DW_AUTH = (() => {
 
   async function ensureSignedIn() {
     await ready;
-    if (!session?.user) await refreshSession();
+    if (!session?.user) await refreshSession(2);
     if (session?.user) return session;
     openModal();
     return new Promise((resolve, reject) => waiters.push({ resolve, reject }));
@@ -201,12 +207,16 @@ const DW_AUTH = (() => {
   async function init() {
     try {
       if (!cfg.authUrl || !cfg.dataApiUrl) throw new Error("Endpoints Neon não configurados.");
-      const { createClient } = await import(SDK_URL);
-      client = createClient({ auth: { url: cfg.authUrl }, dataApi: { url: cfg.dataApiUrl } });
+      const { createClient, BetterAuthVanillaAdapter } = await import(SDK_URL);
+      const auth = { url: cfg.authUrl };
+      if (typeof BetterAuthVanillaAdapter === "function") {
+        auth.adapter = BetterAuthVanillaAdapter({ fetchOptions: { credentials: "include" } });
+      }
+      client = createClient({ auth, dataApi: { url: cfg.dataApiUrl } });
       window.DW_NEON = client;
       if (document.readyState === "loading") await new Promise((resolve) => document.addEventListener("DOMContentLoaded", resolve, { once: true }));
       buildUI();
-      await refreshSession();
+      await refreshSession(2);
       return true;
     } catch (err) {
       console.error("Neon SDK init failed", err);
