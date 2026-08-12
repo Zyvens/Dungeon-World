@@ -15,7 +15,6 @@
   let arm = { action: "", until: 0 };
 
   const $ = (id) => document.getElementById(id);
-  const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
   function params() {
@@ -26,14 +25,25 @@
     };
   }
 
+  function setCloudParams(id, key) {
+    const old = params();
+    const oldMode = localStorage.getItem(MODE_PREFIX + (old.id || "unlinked"));
+    const u = new URL(location.href);
+    u.searchParams.set("sheet", id);
+    u.hash = key ? `key=${encodeURIComponent(key)}` : "";
+    history.replaceState({}, "", u);
+    if (oldMode && !localStorage.getItem(MODE_PREFIX + id)) localStorage.setItem(MODE_PREFIX + id, oldMode);
+  }
+
   function modeKey(id = params().id) { return MODE_PREFIX + (id || "unlinked"); }
   function getMode() { return localStorage.getItem(modeKey()) === "primary" ? "primary" : "manual"; }
-  function setMode(next) { localStorage.setItem(modeKey(), next === "primary" ? "primary" : "manual"); updateStatus(); }
+  function setMode(next) { localStorage.setItem(modeKey(), next === "primary" ? "primary" : "manual"); updateStatus(); renderComparison(); }
 
   function readLocalState() {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "null"); }
     catch (_) { return null; }
   }
+
   function readLocalMedia() {
     try { return window.DW_MEDIA?.get?.() || JSON.parse(localStorage.getItem(MEDIA_KEY) || "null") || { equipment:{}, history:[] }; }
     catch (_) { return { equipment:{}, history:[] }; }
@@ -41,11 +51,10 @@
 
   function canonical(value) {
     if (Array.isArray(value)) return value.map(canonical);
-    if (value && typeof value === "object") {
-      return Object.keys(value).sort().reduce((out, key) => { out[key] = canonical(value[key]); return out; }, {});
-    }
+    if (value && typeof value === "object") return Object.keys(value).sort().reduce((out, key) => { out[key] = canonical(value[key]); return out; }, {});
     return value;
   }
+
   function hash(value) {
     const text = JSON.stringify(canonical(value));
     let h = 2166136261;
@@ -62,12 +71,7 @@
 
   function summary(state) {
     if (!state || typeof state !== "object") return "Sem dados legíveis";
-    const name = state.identity?.name || "Personagem sem nome";
-    const level = state.status?.level ?? "—";
-    const equipment = Array.isArray(state.equipment) ? state.equipment.length : 0;
-    const people = Array.isArray(state.people) ? state.people.length : 0;
-    const story = String(state.story || "").trim().length;
-    return `${name} · nível ${level} · ${equipment} equipamentos · ${people} personagens · ${story} caracteres de história`;
+    return `${state.identity?.name || "Personagem sem nome"} · nível ${state.status?.level ?? "—"} · ${Array.isArray(state.equipment) ? state.equipment.length : 0} equipamentos · ${Array.isArray(state.people) ? state.people.length : 0} personagens · ${String(state.story || "").trim().length} caracteres de história`;
   }
 
   function formatDate(value) {
@@ -80,17 +84,13 @@
     return new Response(JSON.stringify(payload), { status, headers: { "content-type":"application/json; charset=utf-8", "cache-control":"no-store" } });
   }
 
-  // Registra alterações locais sem interferir na persistência original do app.
   Storage.prototype.setItem = function(key, value) {
     const result = nativeSetItem.call(this, key, value);
-    if (this === localStorage && key === STORAGE_KEY) {
-      nativeSetItem.call(localStorage, LOCAL_EDIT_KEY, new Date().toISOString());
-    }
+    if (this === localStorage && key === STORAGE_KEY) nativeSetItem.call(localStorage, LOCAL_EDIT_KEY, new Date().toISOString());
     return result;
   };
 
-  // Barreira de segurança: a ficha nunca faz pull automático.
-  // Em modo manual, PUTs automáticos também são absorvidos localmente.
+  // Protege a ficha contra pull silencioso e contra autosave remoto em aparelhos manuais.
   window.fetch = async function(input, init = {}) {
     const raw = typeof input === "string" ? input : input?.url || "";
     let url;
@@ -102,8 +102,6 @@
     const current = params();
 
     if (method === "GET" && current.id) {
-      // app.js chama GET ao abrir uma URL vinculada. Retornamos o estado local
-      // para impedir que uma versão remota seja aplicada sem decisão do usuário.
       const local = readLocalState();
       return jsonResponse({ id: current.id, state: local || {} }, 200);
     }
@@ -117,10 +115,11 @@
   };
 
   async function api() {
-    for (let i = 0; i < 100 && !window.DW_API; i += 1) await sleep(40);
+    for (let i = 0; i < 125 && !window.DW_API; i += 1) await sleep(40);
     if (!window.DW_API) throw new Error("Data API ainda não está disponível.");
     await window.DW_AUTH?.ready;
     if (!window.DW_AUTH?.getSession?.()?.user) await window.DW_AUTH?.ensureSignedIn?.();
+    if (!window.DW_AUTH?.getSession?.()?.user) throw new Error("Faça login para sincronizar.");
     return window.DW_API;
   }
 
@@ -135,19 +134,13 @@
   }
 
   function backupLocal(reason) {
-    const payload = {
-      created_at: new Date().toISOString(),
-      reason,
-      sheet_id: params().id || null,
-      state: readLocalState(),
-      media: readLocalMedia()
-    };
+    const payload = { created_at:new Date().toISOString(), reason, sheet_id:params().id || null, state:readLocalState(), media:readLocalMedia() };
     nativeSetItem.call(localStorage, BACKUP_KEY, JSON.stringify(payload));
     return payload;
   }
 
   function restoreBackup() {
-    let backup;
+    let backup = null;
     try { backup = JSON.parse(localStorage.getItem(BACKUP_KEY) || "null"); } catch (_) {}
     if (!backup?.state) return alert("Não há backup automático disponível neste dispositivo.");
     if (!confirm(`Restaurar o backup local criado em ${formatDate(backup.created_at)}? O estado atual deste dispositivo será substituído.`)) return;
@@ -169,8 +162,30 @@
     return false;
   }
 
+  async function createLinkedCloud() {
+    const localState = readLocalState();
+    if (!localState) throw new Error("Não há ficha local válida para sincronizar.");
+    await api();
+    backupLocal("before-first-cloud-link");
+    const payload = { ...localState, _media: readLocalMedia() };
+    const res = await adapterFetch("/api/sheet", {
+      method:"POST",
+      headers:{ "content-type":"application/json" },
+      body:JSON.stringify({ title:localState.identity?.name || "Nome do personagem", state:payload })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data?.id || !data?.token) throw new Error(data?.error || "Não foi possível criar a ficha na nuvem.");
+    setCloudParams(data.id, data.token);
+    const at = new Date().toISOString();
+    nativeSetItem.call(localStorage, LAST_SYNC_PREFIX + data.id, JSON.stringify({ direction:"push", at, hash:hash(localState) }));
+    remoteRow = { id:data.id, state:payload, updated_at:at };
+    updateStatus();
+    return data;
+  }
+
   async function pullNow(button) {
     if (busy) return;
+    if (!params().id) return setMessage("Ainda não existe uma ficha na nuvem para trazer. Use “Enviar para a nuvem” para criar o vínculo primeiro.", true);
     if (!armAction("pull", button, "Confirmar: substituir ESTE dispositivo")) {
       setMessage("O pull substituirá somente este dispositivo. Um backup local automático será criado antes da troca.", true);
       return;
@@ -183,7 +198,7 @@
       nativeSetItem.call(localStorage, STORAGE_KEY, JSON.stringify(remoteState));
       if (row.state?._media) window.DW_MEDIA?.set?.(row.state._media);
       nativeSetItem.call(localStorage, LAST_SYNC_PREFIX + params().id, JSON.stringify({ direction:"pull", at:new Date().toISOString(), hash:hash(remoteState) }));
-      setMessage("Conteúdo da nuvem aplicado. Recarregando a ficha…", false);
+      setMessage("Conteúdo da nuvem aplicado. Recarregando a ficha…");
       setTimeout(() => location.reload(), 350);
     } catch (err) {
       setMessage(err?.message || "Não foi possível trazer a ficha da nuvem.", true);
@@ -193,13 +208,33 @@
 
   async function pushNow(button) {
     if (busy) return;
-    const { id, key } = params();
-    if (!id) return setMessage("Esta ficha ainda não está vinculada à nuvem.", true);
-    if (!key) return setMessage("Este link não possui chave de edição; não é possível substituir a nuvem.", true);
+    const current = params();
+
+    // Primeira sincronização: este botão deixa de ser figurativo e cria a ficha remota.
+    if (!current.id) {
+      if (!armAction("create", button, "Confirmar: criar na nuvem")) {
+        setMessage("Esta ficha ainda não possui vínculo. Clique novamente para criar a ficha na nuvem usando o conteúdo deste dispositivo.");
+        return;
+      }
+      busy = true; disableActions(true);
+      try {
+        const created = await createLinkedCloud();
+        setMessage(`Ficha vinculada e enviada com sucesso. ID ${created.id}.`);
+        renderComparison();
+      } catch (err) {
+        setMessage(err?.message || "Não foi possível criar o vínculo com a nuvem.", true);
+      } finally {
+        busy = false; disableActions(false); updateStatus();
+      }
+      return;
+    }
+
+    if (!current.key) return setMessage("Este link não possui chave de edição; não é possível substituir a nuvem.", true);
     if (!armAction("push", button, "Confirmar: substituir A NUVEM")) {
       setMessage("O envio fará deste dispositivo a versão da nuvem. Nada será puxado antes. Clique novamente para confirmar.", true);
       return;
     }
+
     busy = true; disableActions(true);
     try {
       backupLocal("before-cloud-push");
@@ -208,21 +243,61 @@
       const payload = { ...localState, _media: readLocalMedia() };
       const client = await api();
       const ok = await client.rpc("sheet_update", {
-        p_id: id,
-        p_edit_token: key,
-        p_title: localState.identity?.name || "Nome do personagem",
-        p_state: payload
+        p_id:current.id,
+        p_edit_token:current.key,
+        p_title:localState.identity?.name || "Nome do personagem",
+        p_state:payload
       });
       if (ok !== true) throw new Error("A nuvem recusou a chave de edição.");
       const at = new Date().toISOString();
-      nativeSetItem.call(localStorage, LAST_SYNC_PREFIX + id, JSON.stringify({ direction:"push", at, hash:hash(localState) }));
-      remoteRow = { ...(remoteRow || {}), state: payload, updated_at: at };
-      setMessage("Conteúdo deste dispositivo enviado para a nuvem com sucesso.", false);
+      nativeSetItem.call(localStorage, LAST_SYNC_PREFIX + current.id, JSON.stringify({ direction:"push", at, hash:hash(localState) }));
+      remoteRow = { ...(remoteRow || {}), state:payload, updated_at:at };
+      setMessage("Conteúdo deste dispositivo enviado para a nuvem com sucesso.");
       renderComparison();
     } catch (err) {
       setMessage(err?.message || "Não foi possível enviar a ficha para a nuvem.", true);
     } finally {
       busy = false; disableActions(false); updateStatus();
+    }
+  }
+
+  async function smartSync() {
+    if (busy) return;
+    openModal();
+    const current = params();
+    const local = readLocalState();
+    if (!local) return setMessage("Não há ficha local válida para sincronizar.", true);
+
+    // Sem vínculo: sincronizar agora cria o vínculo e faz o primeiro push.
+    if (!current.id) {
+      busy = true; disableActions(true); setMessage("Criando vínculo seguro com a nuvem…");
+      try {
+        const created = await createLinkedCloud();
+        setMessage(`Sincronização concluída. A ficha foi criada na nuvem e vinculada a este dispositivo (${created.id}).`);
+      } catch (err) {
+        setMessage(err?.message || "Não foi possível sincronizar agora.", true);
+      } finally {
+        busy = false; disableActions(false); renderComparison(); updateStatus();
+      }
+      return;
+    }
+
+    // Com vínculo: compara de verdade. Só conclui automaticamente quando os conteúdos são iguais.
+    busy = true; disableActions(true); setMessage("Comparando este dispositivo com a nuvem…");
+    try {
+      const row = await fetchRemote();
+      const remote = stripMedia(row.state);
+      if (hash(local) === hash(remote)) {
+        const at = new Date().toISOString();
+        nativeSetItem.call(localStorage, LAST_SYNC_PREFIX + current.id, JSON.stringify({ direction:"verified", at, hash:hash(local) }));
+        setMessage("Sincronização verificada: este dispositivo e a nuvem já possuem o mesmo conteúdo.");
+      } else {
+        setMessage("Há diferenças entre este dispositivo e a nuvem. Por segurança, nada foi sobrescrito: escolha “Trazer da nuvem” ou “Enviar para a nuvem”.", true);
+      }
+    } catch (err) {
+      setMessage(err?.message || "Não foi possível comparar com a nuvem.", true);
+    } finally {
+      busy = false; disableActions(false); renderComparison(); updateStatus();
     }
   }
 
@@ -234,37 +309,40 @@
   }
 
   function disableActions(disabled) {
-    ["dwSyncPull","dwSyncPush","dwSyncRefresh"].forEach((id) => { const el=$(id); if(el)el.disabled=disabled; });
+    ["dwSyncPull","dwSyncPush","dwSyncRefresh","dwSyncNow"].forEach((id) => { const el=$(id); if(el)el.disabled=disabled; });
   }
 
   function renderComparison() {
     if (!modal) return;
+    const current = params();
     const local = readLocalState();
     const remoteState = stripMedia(remoteRow?.state);
-    const localHash = local ? hash(local) : "";
-    const remoteHash = remoteState ? hash(remoteState) : "";
-    const same = !!localHash && localHash === remoteHash;
+    const same = !!local && !!remoteState && hash(local) === hash(remoteState);
     const localTime = localStorage.getItem(LOCAL_EDIT_KEY);
-    const lastSyncRaw = localStorage.getItem(LAST_SYNC_PREFIX + params().id);
-    let lastSync = null; try { lastSync = JSON.parse(lastSyncRaw || "null"); } catch (_) {}
+    let lastSync = null;
+    try { lastSync = JSON.parse(localStorage.getItem(LAST_SYNC_PREFIX + current.id) || "null"); } catch (_) {}
 
     $("dwSyncLocalSummary").textContent = summary(local);
     $("dwSyncLocalTime").textContent = `Última alteração local detectada: ${formatDate(localTime)}`;
-    $("dwSyncRemoteSummary").textContent = remoteState ? summary(remoteState) : "Ainda não consultado";
-    $("dwSyncRemoteTime").textContent = remoteRow ? `Última alteração informada pela nuvem: ${formatDate(remoteRow.updated_at)}` : "Consulte a nuvem para comparar antes de decidir.";
+    $("dwSyncRemoteSummary").textContent = remoteState ? summary(remoteState) : (current.id ? "Ainda não consultado" : "Nenhuma ficha vinculada ainda");
+    $("dwSyncRemoteTime").textContent = remoteRow ? `Última alteração informada pela nuvem: ${formatDate(remoteRow.updated_at)}` : (current.id ? "Use “Comparar agora” para consultar sem substituir nada." : "O primeiro envio criará a ficha na nuvem.");
     $("dwSyncCompare").textContent = same ? "As duas versões têm o mesmo conteúdo." : remoteState ? "As versões são diferentes. Escolha explicitamente qual deve prevalecer." : "Nenhuma substituição será feita automaticamente.";
     $("dwSyncCompare").classList.toggle("same", same);
-    $("dwSyncLast").textContent = lastSync?.at ? `Última sincronização manual neste dispositivo: ${formatDate(lastSync.at)} (${lastSync.direction === "pull" ? "nuvem → dispositivo" : "dispositivo → nuvem"}).` : "Ainda não há sincronização manual registrada neste dispositivo.";
+    $("dwSyncLast").textContent = lastSync?.at ? `Última sincronização neste dispositivo: ${formatDate(lastSync.at)}.` : "Ainda não há sincronização registrada neste dispositivo.";
 
     const primary = getMode() === "primary";
     $("dwSyncPrimary").checked = primary;
-    $("dwSyncModeText").textContent = primary
-      ? "Principal: alterações deste dispositivo são enviadas automaticamente. Pull continua sempre manual."
-      : "Manual protegido: nenhuma versão remota substitui a local e nenhum autosave substitui a nuvem.";
+    $("dwSyncModeText").textContent = primary ? "Principal: alterações deste dispositivo podem ser enviadas automaticamente. Pull continua sempre manual." : "Manual protegido: nenhuma versão remota substitui a local e nenhum autosave substitui a nuvem.";
+
+    const push = $("dwSyncPush");
+    if (push) push.textContent = current.id ? "Enviar para a nuvem" : "Criar na nuvem com estes dados";
+    const pull = $("dwSyncPull");
+    if (pull) pull.disabled = busy || !current.id;
   }
 
   async function refreshComparison() {
     if (busy) return;
+    if (!params().id) return setMessage("Ainda não existe uma ficha remota para comparar. Use “Sincronizar agora” para criar e vincular esta ficha.", true);
     busy = true; disableActions(true); setMessage("Consultando a nuvem sem aplicar alterações…");
     try { await fetchRemote(); setMessage("Comparação atualizada. Nenhum dado foi substituído."); }
     catch (err) { setMessage(err?.message || "Não foi possível consultar a nuvem.", true); }
@@ -275,22 +353,24 @@
     const status = $("cloudStatus");
     if (!status) return;
     const { id } = params();
-    if (!id) return;
     if (forcedText) { status.textContent = forcedText; return; }
-    if (!navigator.onLine) status.textContent = "Nuvem · offline";
+    if (!id) status.textContent = "Local · não vinculado";
+    else if (!navigator.onLine) status.textContent = "Nuvem · offline";
     else status.textContent = getMode() === "primary" ? "Nuvem · principal" : "Nuvem · manual";
   }
 
   function addStyles() {
     if ($("dwSyncSafetyStyles")) return;
-    const s = document.createElement("style"); s.id="dwSyncSafetyStyles";
+    const s = document.createElement("style");
+    s.id = "dwSyncSafetyStyles";
     s.textContent = `
       .dw-sync-modal{position:fixed;inset:0;z-index:10050;display:none;align-items:flex-start;justify-content:center;overflow:auto;padding:max(18px,env(safe-area-inset-top)) 16px max(24px,env(safe-area-inset-bottom));background:rgba(0,0,0,.76);backdrop-filter:blur(8px)}
       .dw-sync-modal.open{display:flex}.dw-sync-box{width:min(680px,100%);margin:auto;padding:22px;border:1px solid rgba(139,199,238,.24);border-radius:20px;background:#0b1825;color:#e7edf5;box-shadow:0 28px 80px rgba(0,0,0,.55)}
-      .dw-sync-box h2{margin:0 0 5px}.dw-sync-box>p{color:#aebdca}.dw-sync-warning{padding:13px;border:1px solid rgba(222,185,112,.32);border-radius:13px;background:rgba(222,185,112,.07);color:#e6c88c!important;line-height:1.45}.dw-sync-warning b{color:#f1d69d}
-      .dw-sync-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0}.dw-sync-card{padding:14px;border:1px solid rgba(255,255,255,.1);border-radius:14px;background:rgba(0,0,0,.14)}.dw-sync-card h3{margin:0 0 6px;font-size:.95rem}.dw-sync-card p{margin:4px 0;color:#b3c2ce;font-size:.8rem;line-height:1.45}.dw-sync-card .btn{width:100%;margin-top:10px;min-height:44px}.dw-sync-compare{padding:10px 12px;border-radius:10px;background:rgba(255,179,92,.08);color:#e5c488}.dw-sync-compare.same{background:rgba(113,212,156,.08);color:#9ae2b9}
-      .dw-sync-primary{display:flex;gap:10px;align-items:flex-start;padding:13px;border:1px solid rgba(255,255,255,.1);border-radius:13px;background:rgba(0,0,0,.14)}.dw-sync-primary input{width:20px;height:20px;flex:0 0 auto;margin-top:2px;accent-color:var(--accent)}.dw-sync-primary strong{display:block}.dw-sync-primary small{display:block;margin-top:4px;color:#aebdca;line-height:1.4}.dw-sync-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:15px}.dw-sync-message{min-height:1.3em;color:#a9dfbf}.dw-sync-message.bad{color:#ffaaaa}.dw-sync-meta{font-size:.74rem;color:#8fa4b0!important}
-      @media(max-width:600px){.dw-sync-grid{grid-template-columns:1fr}.dw-sync-box{padding:17px}.dw-sync-actions .btn{flex:1 1 auto}}
+      .dw-sync-box h2{margin:0 0 5px}.dw-sync-box>p,.dw-sync-note{color:#9fb0c0;line-height:1.45}.dw-sync-warning{padding:13px;border:1px solid rgba(222,185,112,.32);border-radius:13px;background:rgba(222,185,112,.07);color:#e6c88c;line-height:1.45}
+      .dw-sync-card{margin-top:14px;padding:15px;border:1px solid rgba(139,199,238,.18);border-radius:15px;background:rgba(3,10,17,.22)}.dw-sync-card h3{margin:0 0 5px}.dw-sync-card p{margin:5px 0;color:#aebdca;line-height:1.4}
+      .dw-sync-card .btn{width:100%;margin-top:10px}.dw-sync-primary{display:flex;gap:12px;align-items:flex-start}.dw-sync-primary input{margin-top:5px;transform:scale(1.25)}
+      .dw-sync-message{min-height:1.35em;margin:16px 0 8px;color:#9fdcb9}.dw-sync-message.bad{color:#ff9d9d}.dw-sync-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px}.dw-sync-actions .wide{grid-column:1/-1}.dw-sync-same{color:#9fdcb9!important}
+      @media(max-width:600px){.dw-sync-box{padding:17px}.dw-sync-actions{grid-template-columns:1fr}.dw-sync-actions .wide{grid-column:auto}}
     `;
     document.head.appendChild(s);
   }
@@ -298,67 +378,65 @@
   function buildModal() {
     if (modal) return;
     addStyles();
-    modal = document.createElement("div"); modal.className="dw-sync-modal"; modal.id="dwSyncModal";
+    modal = document.createElement("div");
+    modal.className = "dw-sync-modal";
     modal.innerHTML = `<div class="dw-sync-box" role="dialog" aria-modal="true" aria-labelledby="dwSyncTitle">
       <h2 id="dwSyncTitle">Sincronizar dados</h2>
-      <p>Compare as duas versões e escolha qual conteúdo deve prevalecer.</p>
-      <p class="dw-sync-warning"><b>Nenhuma substituição acontece automaticamente.</b> O app nunca faz pull sozinho. No modo manual, também não envia autosaves para substituir a nuvem.</p>
-      <div id="dwSyncCompare" class="dw-sync-compare">Nenhuma substituição será feita automaticamente.</div>
-      <div class="dw-sync-grid">
-        <section class="dw-sync-card"><h3>↓ Trazer conteúdo da nuvem</h3><p id="dwSyncRemoteSummary">Ainda não consultado</p><p id="dwSyncRemoteTime" class="dw-sync-meta">Consulte a nuvem para comparar antes de decidir.</p><button id="dwSyncPull" class="btn" type="button">Trazer da nuvem</button></section>
-        <section class="dw-sync-card"><h3>↑ Enviar conteúdo deste dispositivo</h3><p id="dwSyncLocalSummary"></p><p id="dwSyncLocalTime" class="dw-sync-meta"></p><button id="dwSyncPush" class="btn secondary" type="button">Enviar para a nuvem</button></section>
+      <p>Compare e escolha qual versão deve prevalecer. Nenhum pull destrutivo acontece sozinho.</p>
+      <div class="dw-sync-warning"><b>Proteção contra sobrescrita:</b> se houver divergência, o app exige uma decisão explícita. O botão “Sincronizar agora” só automatiza operações sem ambiguidade.</div>
+      <div class="dw-sync-card"><h3>↓ Trazer conteúdo externo</h3><p id="dwSyncRemoteSummary">Ainda não consultado</p><p id="dwSyncRemoteTime"></p><button id="dwSyncPull" class="btn" type="button">Trazer da nuvem</button></div>
+      <div class="dw-sync-card"><h3>↑ Enviar conteúdo deste dispositivo</h3><p id="dwSyncLocalSummary"></p><p id="dwSyncLocalTime"></p><button id="dwSyncPush" class="btn secondary" type="button">Enviar para a nuvem</button></div>
+      <div class="dw-sync-card dw-sync-primary"><input id="dwSyncPrimary" type="checkbox"/><div><h3>Definir este dispositivo como principal</h3><p id="dwSyncModeText"></p></div></div>
+      <p id="dwSyncCompare" class="dw-sync-note"></p><p id="dwSyncLast" class="dw-sync-note"></p>
+      <div id="dwSyncMessage" class="dw-sync-message" aria-live="polite"></div>
+      <div class="dw-sync-actions">
+        <button id="dwSyncNow" class="btn wide" type="button">Sincronizar agora</button>
+        <button id="dwSyncRestore" class="btn secondary wide" type="button">Restaurar último backup</button>
+        <button id="dwSyncRefresh" class="btn secondary" type="button">Comparar agora</button>
+        <button id="dwSyncClose" class="btn secondary" type="button">Fechar</button>
       </div>
-      <label class="dw-sync-primary"><input id="dwSyncPrimary" type="checkbox"><span><strong>Definir este dispositivo como principal</strong><small id="dwSyncModeText">Manual protegido</small></span></label>
-      <p class="dw-sync-meta">Dispositivo principal = este aparelho é a fonte de verdade para autosaves. Ele pode enviar alterações automaticamente, mas <b>nunca recebe pull automático</b>.</p>
-      <p id="dwSyncLast" class="dw-sync-meta"></p><p id="dwSyncMessage" class="dw-sync-message" aria-live="polite"></p>
-      <div class="dw-sync-actions"><button id="dwSyncRestore" class="btn secondary" type="button">Restaurar último backup</button><button id="dwSyncRefresh" class="btn secondary" type="button">Comparar agora</button><button id="dwSyncClose" class="btn secondary" type="button">Fechar</button></div>
     </div>`;
     document.body.appendChild(modal);
-    modal.addEventListener("click", (e) => { if (e.target === modal) closeModal(); });
-    $("dwSyncClose").addEventListener("click", closeModal);
-    $("dwSyncRefresh").addEventListener("click", refreshComparison);
     $("dwSyncPull").addEventListener("click", (e) => pullNow(e.currentTarget));
     $("dwSyncPush").addEventListener("click", (e) => pushNow(e.currentTarget));
+    $("dwSyncNow").addEventListener("click", smartSync);
+    $("dwSyncRefresh").addEventListener("click", refreshComparison);
     $("dwSyncRestore").addEventListener("click", restoreBackup);
-    $("dwSyncPrimary").addEventListener("change", (e) => {
-      if (e.target.checked) {
-        const ok = confirm("Tornar este dispositivo PRINCIPAL? A partir das próximas alterações, ele poderá enviar autosaves para a nuvem. Pull continuará sempre manual. O conteúdo atual não será enviado neste instante.");
-        if (!ok) { e.target.checked = false; return; }
-        setMode("primary");
-      } else setMode("manual");
-      renderComparison();
-    });
+    $("dwSyncClose").addEventListener("click", closeModal);
+    $("dwSyncPrimary").addEventListener("change", (e) => setMode(e.target.checked ? "primary" : "manual"));
+    modal.addEventListener("click", (e) => { if (e.target === modal) closeModal(); });
   }
 
-  function openModal() {
-    buildModal();
-    arm = { action:"", until:0 };
-    remoteRow = null;
-    renderComparison();
-    modal.classList.add("open");
-    document.body.style.overflow = "hidden";
-    if (params().id) refreshComparison();
-    else setMessage("Crie primeiro uma ficha na nuvem para habilitar a sincronização.", true);
-  }
-  function closeModal() { if(modal)modal.classList.remove("open");document.body.style.overflow=""; }
+  function openModal() { buildModal(); renderComparison(); modal.classList.add("open"); }
+  function closeModal() { modal?.classList.remove("open"); }
 
-  function inject() {
-    addStyles();
-    const actions = document.querySelector(".top-actions");
-    if (actions && !$("dwSyncTopBtn")) {
-      const b=document.createElement("button");b.id="dwSyncTopBtn";b.className="btn secondary";b.type="button";b.textContent="Sincronizar";b.addEventListener("click",openModal);
-      const account = actions.querySelector(".dw-auth-account"); actions.insertBefore(b, account || actions.firstChild);
+  function installButtons() {
+    const top = document.querySelector(".top-actions");
+    if (top && !$("dwSyncTop")) {
+      const b = document.createElement("button");
+      b.id = "dwSyncTop"; b.type = "button"; b.className = "btn secondary"; b.textContent = "Sincronizar";
+      b.addEventListener("click", smartSync);
+      const cloud = $("cloudBtn"); top.insertBefore(b, cloud || top.firstChild);
     }
-    // O botão antigo de 'Salvar agora' passa a abrir o fluxo protegido.
-    document.addEventListener("click", (e) => {
-      if (e.target?.id !== "saveCloudBtn") return;
-      e.preventDefault(); e.stopImmediatePropagation(); openModal();
-    }, true);
+
+    const save = $("saveCloudBtn");
+    if (save) {
+      save.textContent = "Sincronizar agora";
+      save.addEventListener("click", (e) => { e.preventDefault(); e.stopImmediatePropagation(); smartSync(); }, true);
+    }
+
     updateStatus();
   }
 
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", inject, { once:true });
-  else inject();
-  window.addEventListener("online", updateStatus);
-  window.addEventListener("offline", updateStatus);
+  async function init() {
+    if (document.readyState === "loading") await new Promise((resolve) => document.addEventListener("DOMContentLoaded", resolve, { once:true }));
+    buildModal();
+    installButtons();
+    window.addEventListener("online", updateStatus);
+    window.addEventListener("offline", updateStatus);
+    window.addEventListener("popstate", () => { remoteRow = null; updateStatus(); renderComparison(); });
+  }
+
+  window.DW_SYNC_SAFETY = { open:openModal, syncNow:smartSync, compare:refreshComparison };
+  init();
 })();
