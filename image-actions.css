@@ -1,21 +1,26 @@
 .image-action,.person-image label,.equipment-media label{transition:opacity .16s ease,visibility .16s ease,transform .16s ease}.history-image-card button{opacity:0;visibility:hidden;pointer-events:none;transform:translateY(-3px);transition:opacity .16s ease,visibility .16s ease,transform .16s ease;display:grid!important;place-items:center!important;background:rgba(18,8,10,.9)!important;color:var(--danger)!important;border:1px solid color-mix(in srgb,var(--danger) 65%,transparent)!important;box-shadow:0 4px 14px rgba(0,0,0,.35)!important}.history-image-card:hover button,.history-image-card:focus-within button{opacity:1;visibility:visible;pointer-events:auto;transform:none}.history-image-card button:hover{background:color-mix(in srgb,#21090d 70%,var(--danger) 30%)!important}
 
-/* Com imagem carregada, toda a própria imagem vira a área de clique para troca.
-   O label continua funcional, mas fica 100% invisível e não ocupa visualmente a arte. */
+/* Quando existe imagem, a própria arte inteira é o controle de troca.
+   O label fica invisível sobre toda a área, preservando o clique sem cobrir a imagem. */
 .portrait-wrap:has(>img[src]:not([src=""])) .image-action,
 .person-image:has(>img[src]:not([src=""])) label,
 .equipment-media:has(>img) label{
   position:absolute!important;inset:0!important;display:block!important;opacity:0!important;visibility:visible!important;pointer-events:auto!important;transform:none!important;padding:0!important;margin:0!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;font-size:0!important;cursor:pointer!important;z-index:4
 }
 
-/* Sem imagem, mostramos somente uma instrução pequena e discreta. */
+/* Sem imagem, existe somente a instrução discreta de troca. */
 .portrait-wrap:not(:has(>img[src]:not([src=""]))) .image-action,
 .person-image:not(:has(>img[src]:not([src=""]))) label,
 .equipment-media:not(:has(>img)) label{
-  position:absolute!important;left:50%!important;right:auto!important;top:50%!important;bottom:auto!important;transform:translate(-50%,-50%)!important;display:flex!important;align-items:center!important;justify-content:center!important;width:max-content!important;max-width:calc(100% - 16px)!important;min-height:34px!important;padding:7px 10px!important;border-radius:9px!important;background:rgba(4,10,16,.82)!important;color:#fff!important;border:1px solid rgba(255,255,255,.14)!important;box-shadow:0 4px 16px rgba(0,0,0,.22)!important;font-size:.64rem!important;line-height:1.2!important;text-align:center!important;white-space:normal!important;opacity:1!important;visibility:visible!important;pointer-events:auto!important;cursor:pointer!important;z-index:4
+  position:absolute!important;left:50%!important;right:auto!important;top:50%!important;bottom:auto!important;transform:translate(-50%,-50%)!important;display:flex!important;align-items:center!important;justify-content:center!important;width:max-content!important;max-width:calc(100% - 14px)!important;min-height:34px!important;padding:7px 10px!important;border-radius:9px!important;background:rgba(4,10,16,.82)!important;color:#fff!important;border:1px solid rgba(255,255,255,.14)!important;box-shadow:0 4px 16px rgba(0,0,0,.22)!important;font-size:0!important;line-height:1.2!important;text-align:center!important;white-space:normal!important;opacity:1!important;visibility:visible!important;pointer-events:auto!important;cursor:pointer!important;z-index:4
+}
+.portrait-wrap:not(:has(>img[src]:not([src=""]))) .image-action::after,
+.person-image:not(:has(>img[src]:not([src=""]))) label::after,
+.equipment-media:not(:has(>img)) label::after{
+  content:"Clique para trocar a imagem";font-size:.64rem;font-weight:700;line-height:1.2
 }
 
-/* O texto "Sem imagem" deixa de competir visualmente com a instrução de clique. */
-.equipment-media:not(:has(>img)) .media-placeholder{opacity:.32}
+/* Em slots vazios não exibimos um segundo texto concorrendo com a instrução. */
+.equipment-media:not(:has(>img)) .media-placeholder{opacity:0}
 
 @media(hover:none),(pointer:coarse){.history-image-card button{opacity:1;visibility:visible;pointer-events:auto;transform:none;width:38px!important;height:38px!important}}
