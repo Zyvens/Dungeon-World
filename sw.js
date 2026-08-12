@@ -1,4 +1,4 @@
-const CACHE = "dungeon-world-v1.0.0-ui12";
+const CACHE = "dungeon-world-v1.0.0-ui13";
 const BASE = self.registration.scope;
 const CORE = [
   "",
