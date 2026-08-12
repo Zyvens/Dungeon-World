@@ -15,6 +15,7 @@
   <script defer src="auth.js"></script>
   <script defer src="data-api.js"></script>
   <script defer src="github-pages-adapter.js"></script>
+  <script defer src="sync-safety.js"></script>
   <script defer src="classes.js"></script>
   <script defer src="app.js"></script>
 </head>
@@ -174,8 +175,8 @@
         </article>
         <article class="card">
           <div class="card-head"><div><h2>Dados</h2><p>Persistência local + Neon Data API.</p></div></div>
-          <p>O app salva automaticamente neste dispositivo. Entre em uma conta para criar uma ficha na nuvem e abrir a mesma ficha em outros dispositivos. O Gameplay compartilhado fica disponível pelo botão no topo.</p>
-          <div class="button-row"><button id="saveCloudBtn" class="btn" type="button">Salvar agora na nuvem</button><button id="resetSheetBtn" class="btn danger" type="button">Nova ficha genérica</button></div>
+          <p>O app salva automaticamente neste dispositivo. A sincronização da ficha é protegida: pull é sempre manual e o envio automático só acontece quando este aparelho é definido como dispositivo principal.</p>
+          <div class="button-row"><button id="saveCloudBtn" class="btn" type="button">Sincronizar dados</button><button id="resetSheetBtn" class="btn danger" type="button">Nova ficha genérica</button></div>
           <p id="sheetIdentity" class="mono small"></p>
         </article>
       </div>
